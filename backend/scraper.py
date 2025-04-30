@@ -1,120 +1,144 @@
-from playwright.sync_api import sync_playwright
 import time
 from fuzzywuzzy import fuzz
+from playwright.async_api import async_playwright
+import asyncio
 
 def is_relevant(title: str, query: str, threshold: int = 90) -> bool:
-    """
-    Return True if title matches query based on partial fuzzy ratio.
-    """
     score = fuzz.partial_ratio(query.lower(), title.lower())
     return score >= threshold
 
-def scrape_stmdiecast(query):
+async def scrape_stmdiecast_page(page, query, page_num):
     base_url = "https://www.stmdiecast.com/search"
-    results = []
-    page_num = 1
+    url = f"{base_url}?&options%5Bprefix%5D=last&page={page_num}&q={query}"
+    print(f"Scraping STMDiecast page {page_num}: {url}")
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+    try:
+        await page.goto(url, timeout=30000)
+        await page.wait_for_load_state("load", timeout=10000)
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        await asyncio.sleep(2)
+    except Exception as e:
+        print(f"[STMDiecast] Timeout or error on page {page_num}: {e}")
+        return []
+
+    products = await page.query_selector_all('li.grid__item')
+    results = []
+
+    for product in products:
+        title_tag = await product.query_selector('h3.card__heading a')
+        price_tag = await product.query_selector('.price-item--last')
+        img_tag = await product.query_selector('img')
+
+        if title_tag:
+            title = (await title_tag.inner_text()).strip()
+            link = "https://www.stmdiecast.com" + (await title_tag.get_attribute('href'))
+            price = (await price_tag.inner_text()).strip() if price_tag else "Price not found"
+            image = await img_tag.get_attribute('src') if img_tag else None
+
+            results.append({
+                "title": title,
+                "price": price,
+                "link": link,
+                "image": image,
+                "source": "STMDiecast"
+            })
+
+    return results
+
+async def scrape_stmdiecast(query):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        results = []
+        page_num = 1
 
         while True:
-            url = f"{base_url}?&options%5Bprefix%5D=last&page={page_num}&q={query}"
-            print(f"Scraping STMDiecast page {page_num}: {url}")
-            time.sleep(2)
-            page.goto(url)
+            context = await browser.new_context()
+            page = await context.new_page()
+            page_results = await scrape_stmdiecast_page(page, query, page_num)
+            await context.close()
 
-            products = page.query_selector_all('li.grid__item')
-
-            # If no products found on this page, stop
-            if not products:
-                print(f"No more products found on page {page_num}. Stopping.")
+            if not page_results:
                 break
 
-            for product in products:
-                title_tag = product.query_selector('h3.card__heading a')
-                price_tag = product.query_selector('.price-item--last')
-                img_tag = product.query_selector('img')
-
-                if title_tag:
-                    title = title_tag.inner_text().strip()
-                    link = "https://www.stmdiecast.com" + title_tag.get_attribute('href')
-                    price = price_tag.inner_text().strip() if price_tag else "Price not found"
-                    image = img_tag.get_attribute('src') if img_tag else None
-
-                    if is_relevant(title, query):
-                        results.append({
-                            "title": title,
-                            "price": price,
-                            "link": link,
-                            "image": image,
-                            "source": "STMDiecast"
-                        })
-
+            results.extend(page_results)
             page_num += 1
 
-        browser.close()
+        await browser.close()
+        return results
 
-    return results
+async def scrape_livecarmodel_page(page, url):
+    print(f"Scraping: {url}")
+    try:
+        await page.goto(url, timeout=30000)
+        await page.wait_for_load_state("load", timeout=10000)
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        await asyncio.sleep(2)
+    except Exception as e:
+        print(f"[LiveCarModel] Timeout or error on page: {e}")
+        return []
 
-def scrape_livecarmodel(query):
-    base = "https://livecarmodel.com"
-    search_url = f"{base}/search.php?search_query={query}&section=product"
-    visited_urls = set()
+    products = await page.query_selector_all('li.product')
     results = []
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
-        page.goto(search_url)
-        time.sleep(3)
+    for product in products:
+        title_tag = await product.query_selector('h4.card-title')
+        link_tag = await product.query_selector('a.image-link.desktop')
+        price_tag = await product.query_selector('[data-product-price-without-tax]')
+        img_tag = await product.query_selector('img.card-image')
 
-        # Collect initial and all pagination URLs
-        pagination_urls = set()
-        pagination_urls.add(search_url)
+        if title_tag and link_tag:
+            title = (await title_tag.inner_text()).strip()
+            link = await link_tag.get_attribute('href')
+            price = (await price_tag.inner_text()).strip() if price_tag else "Price not found"
+            image = await img_tag.get_attribute('data-src') or await img_tag.get_attribute('src') if img_tag else None
 
-        page_links = page.query_selector_all('a.pagination-link')
-        for link in page_links:
-            href = link.get_attribute("href")
-            if href and "/search.php" in href:
-                full_url = base + href
-                pagination_urls.add(full_url)
-
-        # Visit each page and scrape
-        for url in sorted(pagination_urls):
-            if url in visited_urls:
-                continue
-
-            print(f"Scraping: {url}")
-            page.goto(url)
-            page.wait_for_load_state("networkidle")
-            time.sleep(2)
-            visited_urls.add(url)
-
-            products = page.query_selector_all('li.product')
-
-            for product in products:
-                title_tag = product.query_selector('h4.card-title')
-                link_tag = product.query_selector('a.image-link.desktop')
-                price_tag = product.query_selector('[data-product-price-without-tax]')
-                img_tag = product.query_selector('img.card-image')
-
-                if title_tag and link_tag:
-                    title = title_tag.inner_text().strip()
-                    link = link_tag.get_attribute('href')
-                    price = price_tag.inner_text().strip() if price_tag else "Price not found"
-                    image = img_tag.get_attribute('src') if img_tag else None
-
-                    if is_relevant(title, query):
-                        results.append({
-                            "title": title,
-                            "price": price,
-                            "link": link,
-                            "image": image,
-                            "source": "LiveCarModel"
-                        })
-
-        browser.close()
-        print(f"Scraped {len(results)} products")
+            results.append({
+                "title": title,
+                "price": price,
+                "link": link,
+                "image": image,
+                "source": "LiveCarModel"
+            })
 
     return results
+
+async def scrape_livecarmodel(query):
+    base = "https://livecarmodel.com"
+    search_url = f"{base}/search.php?search_query={query}&section=product"
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context()
+        main_page = await context.new_page()
+
+        try:
+            await main_page.goto(search_url, timeout=30000)
+            await main_page.wait_for_load_state("load", timeout=10000)
+        except Exception as e:
+            print(f"[LiveCarModel] Failed to load main search page: {e}")
+            await browser.close()
+            return []
+
+        pagination_urls = {search_url}
+        page_links = await main_page.query_selector_all('a.pagination-link')
+        for link in page_links:
+            href = await link.get_attribute("href")
+            if href and "/search.php" in href:
+                pagination_urls.add(base + href)
+
+        await context.close()
+
+        tasks = []
+        for url in pagination_urls:
+            async def scrape_with_new_page(url=url):
+                ctx = await browser.new_context()
+                pg = await ctx.new_page()
+                result = await scrape_livecarmodel_page(pg, url)
+                await ctx.close()
+                return result
+
+            tasks.append(asyncio.create_task(scrape_with_new_page()))
+
+        results = await asyncio.gather(*tasks)
+        await browser.close()
+        return [item for sublist in results for item in sublist]
