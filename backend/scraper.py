@@ -2,8 +2,10 @@ import time
 from fuzzywuzzy import fuzz
 from playwright.async_api import async_playwright
 import asyncio
+from ebay_auth import get_ebay_token
+import httpx
 
-def is_relevant(title: str, query: str, threshold: int = 90) -> bool:
+def is_relevant(title: str, query: str, threshold: int = 99) -> bool:
     score = fuzz.partial_ratio(query.lower(), title.lower())
     return score >= threshold
 
@@ -142,3 +144,104 @@ async def scrape_livecarmodel(query):
         results = await asyncio.gather(*tasks)
         await browser.close()
         return [item for sublist in results for item in sublist]
+    
+
+async def scrape_modelcarshouston_page(page, query):
+    url = f"https://www.modelcarshouston.com/search?q={query}"
+    print(f"Scraping ModelCarsHouston: {url}")
+
+    try:
+        await page.goto(url, timeout=30000)
+        await page.wait_for_load_state("load", timeout=10000)
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        await asyncio.sleep(2)
+    except Exception as e:
+        print(f"[ModelCarsHouston] Error loading page: {e}")
+        return []
+
+    products = await page.query_selector_all('.product-item')
+    results = []
+
+    for product in products:
+        title_tag = await product.query_selector('.product-item__title')
+        link_tag = await product.query_selector('a.product-item__title')
+        price_tag = await product.query_selector('.price')
+        img_tag = await product.query_selector('img')
+
+        if title_tag and link_tag:
+            title = (await title_tag.inner_text()).strip()
+            link = "https://www.modelcarshouston.com" + (await link_tag.get_attribute('href'))
+            price = (await price_tag.inner_text()).strip() if price_tag else "Price not found"
+
+            image = None
+            if img_tag:
+                image = await img_tag.get_attribute('data-srcset') \
+                    or await img_tag.get_attribute('data-src') \
+                    or await img_tag.get_attribute('src')
+                if image and " " in image:
+                    image = image.split(" ")[0]
+
+            results.append({
+                "title": title,
+                "price": price,
+                "link": link,
+                "image": image,
+                "source": "ModelCarsHouston"
+            })
+
+
+    return results
+
+
+async def scrape_modelcarshouston(query):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context()
+        page = await context.new_page()
+
+        results = await scrape_modelcarshouston_page(page, query)
+
+        await context.close()
+        await browser.close()
+        return results
+
+async def scrape_ebay(query):
+    try:
+        token = await get_ebay_token()
+    except Exception as e:
+        print(f"[eBay] Auth error: {e}")
+        return []
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+    params = {
+        "q": query
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.ebay.com/buy/browse/v1/item_summary/search",
+            headers=headers,
+            params=params,
+        )
+
+        if response.status_code != 200:
+            print(f"[eBay] Error: {response.status_code} - {response.text}")
+            return []
+
+        data = response.json()
+        results = []
+
+        for item in data.get("itemSummaries", []):
+            results.append({
+                "title": item.get("title"),
+                "price": f'{item["price"]["value"]} {item["price"]["currency"]}' if "price" in item else "N/A",
+                "link": item.get("itemWebUrl"),
+                "image": item.get("image", {}).get("imageUrl"),
+                "source": "eBay"
+            })
+
+        return results

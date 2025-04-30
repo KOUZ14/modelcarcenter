@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from scraper import scrape_stmdiecast, scrape_livecarmodel
+from scraper import scrape_stmdiecast, scrape_livecarmodel, scrape_modelcarshouston, scrape_ebay
 from flask_cors import CORS
 from markupsafe import escape
 import logging
@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
 
-# 🚨 Enable full CORS for development
+# Enable full CORS for development
 CORS(app)  # ← remove any previous `CORS(app, ...)` lines
 
 @app.route('/search', methods=['GET'])
@@ -18,12 +18,16 @@ async def search():
     if not query:
         return jsonify({'error': 'Missing query'}), 400
 
-    # 🔧 Wrap coroutines in tasks
+
     stm_task = asyncio.create_task(scrape_stmdiecast(query))
     lcm_task = asyncio.create_task(scrape_livecarmodel(query))
+    mch_task = asyncio.create_task(scrape_modelcarshouston(query))
+    ebay_task = asyncio.create_task(scrape_ebay(query))
+
+
 
     # Return partial results as they complete
-    done, pending = await asyncio.wait([stm_task, lcm_task], return_when=asyncio.FIRST_COMPLETED)
+    done, pending = await asyncio.wait([stm_task,lcm_task,mch_task,ebay_task], return_when=asyncio.FIRST_COMPLETED)
 
     results = []
     for task in done:
