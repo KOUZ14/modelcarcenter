@@ -1,5 +1,5 @@
-import pkg from '@netlify/next';
-const { withNetlify } = pkg;
+import netlifyPlugin from '@netlify/next';
+const withNetlify = netlifyPlugin.withNetlify;
 
 export default withNetlify({
   reactStrictMode: true,
