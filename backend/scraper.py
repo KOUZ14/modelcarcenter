@@ -5,6 +5,13 @@ import asyncio
 from ebay_auth import get_ebay_token
 import httpx
 
+REQUIRED_KEYWORDS = ["model", "car", "diecast", "1:64", "1:18", "scale"]
+
+def is_model_car_title(title):
+    title_lower = title.lower()
+    return any(keyword in title_lower for keyword in REQUIRED_KEYWORDS)
+
+
 def is_relevant(title: str, query: str, threshold: int = 99) -> bool:
     score = fuzz.partial_ratio(query.lower(), title.lower())
     return score >= threshold
@@ -218,7 +225,7 @@ async def scrape_ebay(query):
     }
 
     params = {
-        "q": query
+        "q": f"{query} model car",
     }
 
     async with httpx.AsyncClient() as client:
@@ -236,8 +243,12 @@ async def scrape_ebay(query):
         results = []
 
         for item in data.get("itemSummaries", []):
+            title = item.get("title", "")
+            if not is_model_car_title(title):
+                continue
+
             results.append({
-                "title": item.get("title"),
+                "title": title,
                 "price": f'{item["price"]["value"]} {item["price"]["currency"]}' if "price" in item else "N/A",
                 "link": item.get("itemWebUrl"),
                 "image": item.get("image", {}).get("imageUrl"),
