@@ -72,7 +72,7 @@ export default function Home() {
       // Simulate loading progress
       setTimeout(async () => {
         try {
-          const res = await fetch(`http://localhost:5000/search?q=${encodeURIComponent(query)}`);
+          const res = await fetch(`https://modelcarcenterapi-production.up.railway.app/search?q=${encodeURIComponent(query)}`);
           const data = await res.json();
 
           if (!res.ok) {
