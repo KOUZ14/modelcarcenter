@@ -1,6 +1,5 @@
-const { withNetlify } = require('@netlify/plugin-nextjs');
-
-module.exports = withNetlify({
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   reactStrictMode: true,
   images: {
     domains: [
@@ -11,4 +10,6 @@ module.exports = withNetlify({
       'www.awesomediecast.com',
     ],
   },
-});
+};
+
+module.exports = nextConfig;
