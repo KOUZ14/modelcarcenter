@@ -1,7 +1,6 @@
-import netlifyPlugin from '@netlify/next';
-const withNetlify = netlifyPlugin.withNetlify;
+const { withNetlify } = require('@netlify/next');
 
-export default withNetlify({
+module.exports = withNetlify({
   reactStrictMode: true,
   images: {
     domains: [
