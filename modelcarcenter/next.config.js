@@ -1,4 +1,5 @@
-const { withNetlify } = require('@netlify/next');
+const netlifyPlugin = require('@netlify/next');
+const withNetlify = netlifyPlugin.withNetlify;
 
 module.exports = withNetlify({
   reactStrictMode: true,
