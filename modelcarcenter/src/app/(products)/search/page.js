@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Search, SlidersHorizontal, ChevronDown, ArrowDownAZ, ArrowUpAZ, ArrowDownUp, ArrowUpDown, ExternalLink, Filter, X, Tag, Clock, ShoppingCart } from 'lucide-react';
+import Image from 'next/image';
 
 export default function ModelCarFinder() {
   const [query, setQuery] = useState('');
@@ -387,7 +388,7 @@ export default function ModelCarFinder() {
                 <div className="flex items-center gap-1">
                   <span className="text-xl font-bold text-white">{filteredCars.length}</span>
                   <span className="text-gray-400">results for</span>
-                  <span className="font-medium text-blue-400">"{query}"</span>
+                  <span className="font-medium text-blue-400">&quot;{query}&quot;</span>
                 </div>
               )}
             </div>
@@ -453,7 +454,7 @@ export default function ModelCarFinder() {
                 <div className="absolute inset-3 border-3 border-t-blue-400 border-r-blue-300 border-b-blue-200 border-l-blue-500 rounded-full animate-spin animation-delay-150"></div>
               </div>
               <p className="text-lg font-medium text-gray-300">Searching across all sellers...</p>
-              <p className="text-sm text-gray-400 mt-2">Finding the best deals for "{query}"</p>
+              <p className="text-sm text-gray-400 mt-2">Finding the best deals for &quot;{query}&quot;</p>
             </div>
           )}
 
@@ -473,7 +474,7 @@ export default function ModelCarFinder() {
               </div>
               <h3 className="text-2xl font-semibold text-gray-200 mb-3">No results found</h3>
               <p className="text-gray-400 max-w-md mx-auto">
-                We couldn't find any model cars matching "{query}". Try searching for a different model or check your spelling.
+                We couldn&apos;t find any model cars matching &quot;{query}&quot;. Try searching for a different model or check your spelling.
               </p>
               <div className="mt-8">
                 <p className="text-sm text-gray-500 mb-3">Popular searches</p>
@@ -525,7 +526,7 @@ export default function ModelCarFinder() {
                     <Filter className="h-8 w-8 text-purple-400" />
                   </div>
                   <h4 className="text-lg font-medium text-gray-200 mb-2">Precise Filtering</h4>
-                  <p className="text-gray-400 text-sm">Find exactly what you're looking for with detailed filters.</p>
+                  <p className="text-gray-400 text-sm">Find exactly what you&apos;re looking for with detailed filters.</p>
                 </div>
               </div>
               
@@ -567,7 +568,7 @@ export default function ModelCarFinder() {
                   <div className={`bg-gray-800/50 rounded-xl overflow-hidden transition-all duration-300 h-full flex flex-col border border-gray-700/50 ${activeCard === idx ? 'shadow-lg shadow-blue-500/10 border-blue-500/50 scale-105' : 'shadow-md'}`}>
                     <div className="relative overflow-hidden">
                       <div className={`absolute inset-0 bg-gradient-to-b from-blue-600/10 to-blue-600/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10`}></div>
-                      <img
+                      <Image
                         src={car.image}
                         alt={car.title}
                         className="w-full h-56 object-cover object-center transition-transform duration-700 group-hover:scale-110"
