@@ -70,7 +70,6 @@ export default function Home() {
   
     try {
       const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
-      console.log("API_BASE:", API_BASE);
       const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
 
       const data = await res.json();
