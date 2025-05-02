@@ -69,8 +69,9 @@ export default function Home() {
     setCurrentPage(1);
   
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
-      const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
+
+      const res = await fetch(`/api/search?q=${query}`);
+
 
       const data = await res.json();
   
