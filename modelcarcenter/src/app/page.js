@@ -60,40 +60,61 @@ export default function Home() {
 
   const handleSearch = async () => {
     if (!query.trim()) return;
-
+  
     setLoading(true);
     setError('');
     setCars([]);
     setShowSearchSuggestions(false);
     setSearchMode('searching');
     setCurrentPage(1);
-
+  
     try {
-      // Simulate loading progress
-      setTimeout(async () => {
-        try {
-          const res = await fetch(`https://modelcarcenterapi-production.up.railway.app/search?q=${encodeURIComponent(query)}`);
-          const data = await res.json();
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+      console.log("API_BASE:", API_BASE);
+      const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
 
-          if (!res.ok) {
-            setError(data.error || 'Something went wrong.');
-          } else {
-            setCars(data);
+      const data = await res.json();
+  
+      if (!res.ok || !data.request_id) {
+        setError(data.error || 'Something went wrong starting your search.');
+        setLoading(false);
+        setSearchMode('normal');
+        return;
+      }
+  
+      const requestId = data.request_id;
+  
+      // Start polling results
+      const pollInterval = setInterval(async () => {
+        try {
+          const res = await fetch(`${API_BASE}/results/${requestId}`);
+          const resultData = await res.json();
+  
+          if (resultData.status === 'done') {
+            clearInterval(pollInterval);
+            setCars(resultData.results || []);
+            setSearchMode('results');
+            setLoading(false);
+          } else if (resultData.status === 'failed') {
+            clearInterval(pollInterval);
+            setError(resultData.error || 'Scraping failed.');
+            setLoading(false);
+            setSearchMode('normal');
           }
-          setSearchMode('results');
-        } catch (err) {
-          setError('Failed to fetch data from the server.');
-          setSearchMode('normal');
-        } finally {
+        } catch (pollErr) {
+          clearInterval(pollInterval);
+          setError('Error retrieving search results.');
           setLoading(false);
+          setSearchMode('normal');
         }
-      }, 1500);
+      }, 3000); // Poll every 3 seconds
     } catch (err) {
-      setError('Failed to fetch data from the server.');
+      setError('Failed to initiate search.');
       setLoading(false);
       setSearchMode('normal');
     }
   };
+  
 
   // Handle keypress for search input
   const handleKeyPress = (e) => {
@@ -194,6 +215,14 @@ export default function Home() {
       default: return <SlidersHorizontal size={18} />;
     }
   };
+
+  const normalizeImageUrl = (url) => {
+    if (url.startsWith('//')) {
+      return 'https:' + url;
+    }
+    return url;
+  };
+  
 
   // Generate pagination numbers
   const getPaginationNumbers = () => {
@@ -296,10 +325,12 @@ export default function Home() {
               onKeyPress={handleKeyPress}
               onFocus={handleSearchFocus}
               onBlur={handleSearchBlur}
+              suppressHydrationWarning={true}
               className="w-full pl-12 pr-20 py-5 border-0 rounded-xl bg-gray-800/60 backdrop-blur-md focus:ring-2 focus:ring-blue-500 shadow-lg text-gray-100 placeholder-gray-400"
             />
             <button
               onClick={handleSearch}
+              suppressHydrationWarning={true}
               className="absolute right-2 top-2 bottom-2 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition duration-200 shadow-md shadow-blue-900/50"
             >
               Search
@@ -397,10 +428,11 @@ export default function Home() {
             
             <div className="flex items-center gap-3">
               <div className="relative">
-                <button 
-                  onClick={() => setShowSortMenu(!showSortMenu)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-200 font-medium transition"
-                >
+              <button 
+                onClick={() => setShowSortMenu(!showSortMenu)}
+                suppressHydrationWarning={true}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-200 font-medium transition"
+              >
                   {getSortIcon()}
                   <span>Sort</span>
                   <ChevronDown size={16} className={`transition-transform ${showSortMenu ? 'rotate-180' : ''}`} />
@@ -440,6 +472,7 @@ export default function Home() {
               
               <button 
                 onClick={() => setShowFilters(true)}
+                suppressHydrationWarning={true}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-700/50 hover:bg-gray-700 text-gray-200 font-medium md:hidden"
               >
                 <Filter size={18} />
@@ -542,6 +575,7 @@ export default function Home() {
                         setQuery(search);
                         handleSearch();
                       }}
+                      suppressHydrationWarning={true}
                       className="px-4 py-2 bg-gray-700/50 hover:bg-gray-700 rounded-full text-sm text-gray-300 transition"
                     >
                       {search}
@@ -571,10 +605,13 @@ export default function Home() {
                     <div className="relative overflow-hidden">
                       <div className={`absolute inset-0 bg-gradient-to-b from-blue-600/10 to-blue-600/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10`}></div>
                       <Image
-                        src={car.image}
+                        src={normalizeImageUrl(car.image)}
                         alt={car.title}
+                        width={400}
+                        height={300}
                         className="w-full h-56 object-cover object-center transition-transform duration-700 group-hover:scale-110"
                       />
+
                       <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-gray-900 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10"></div>
                     </div>
                     <div className="p-5 flex flex-col flex-grow relative z-10">

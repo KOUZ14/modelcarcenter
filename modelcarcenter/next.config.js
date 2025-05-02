@@ -8,6 +8,7 @@ const nextConfig = {
       'www.stmdiecast.com',
       'fairfieldcollectibles.com',
       'www.awesomediecast.com',
+      'cdn11.bigcommerce.com'
     ],
   },
 };
