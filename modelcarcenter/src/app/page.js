@@ -568,19 +568,19 @@ export default function Home() {
               <div className="mt-10">
                 <h4 className="text-lg font-medium text-gray-200 mb-4">Popular searches</h4>
                 <div className="flex flex-wrap gap-2">
-                  {[...recentSearches, 'Aston Martin DB5', 'Koenigsegg Jesko', 'Mclaren P1', 'Ferrari F40'].map((search, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        setQuery(search);
-                        handleSearch();
-                      }}
-                      suppressHydrationWarning={true}
-                      className="px-4 py-2 bg-gray-700/50 hover:bg-gray-700 rounded-full text-sm text-gray-300 transition"
-                    >
-                      {search}
-                    </button>
-                  ))}
+                {[...(Array.isArray(recentSearches) ? recentSearches : []), 'Aston Martin DB5', 'Koenigsegg Jesko', 'Mclaren P1', 'Ferrari F40'].map((search, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setQuery(search);
+                      handleSearch();
+                    }}
+                    className="px-4 py-2 bg-gray-700/50 hover:bg-gray-700 rounded-full text-sm text-gray-300 transition"
+                  >
+                    {search}
+                  </button>
+                ))}
+
                 </div>
               </div>
             </div>
