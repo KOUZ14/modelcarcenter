@@ -59,60 +59,38 @@ export default function Home() {
   }, []);
 
   const handleSearch = async () => {
-    if (!query.trim()) return;
-  
-    setLoading(true);
-    setError('');
-    setCars([]);
-    setShowSearchSuggestions(false);
-    setSearchMode('searching');
-    setCurrentPage(1);
-  
-    try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
-      const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
+  if (!query.trim()) return;
 
-      const data = await res.json();
-  
-      if (!res.ok || !data.request_id) {
-        setError(data.error || 'Something went wrong starting your search.');
-        setLoading(false);
-        setSearchMode('normal');
-        return;
-      }
-  
-      const requestId = data.request_id;
-  
-      // Start polling results
-      const pollInterval = setInterval(async () => {
-        try {
-          const res = await fetch(`${API_BASE}/results/${requestId}`);
-          const resultData = await res.json();
-  
-          if (resultData.status === 'done') {
-            clearInterval(pollInterval);
-            setCars(resultData.results || []);
-            setSearchMode('results');
-            setLoading(false);
-          } else if (resultData.status === 'failed') {
-            clearInterval(pollInterval);
-            setError(resultData.error || 'Scraping failed.');
-            setLoading(false);
-            setSearchMode('normal');
-          }
-        } catch (pollErr) {
-          clearInterval(pollInterval);
-          setError('Error retrieving search results.');
-          setLoading(false);
-          setSearchMode('normal');
-        }
-      }, 3000); // Poll every 3 seconds
-    } catch (err) {
-      setError('Failed to initiate search.');
+  setLoading(true);
+  setError('');
+  setCars([]);
+  setShowSearchSuggestions(false);
+  setSearchMode('searching');
+  setCurrentPage(1);
+
+  try {
+    const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+    const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error || 'Something went wrong.');
       setLoading(false);
       setSearchMode('normal');
+      return;
     }
-  };
+
+    setCars(data || []);
+    setSearchMode('results');
+    setLoading(false);
+  } catch (err) {
+    console.error(err);
+    setError('Failed to fetch search results.');
+    setLoading(false);
+    setSearchMode('normal');
+  }
+};
+
   
 
   // Handle keypress for search input
