@@ -1,3 +1,15 @@
+# ModelCarCenter Frontend
+
+## 🚀 How to Run
+
+```bash
+npm install && npm run dev
+```
+
+The app will start on `http://localhost:3000`
+
+---
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
