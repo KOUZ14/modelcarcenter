@@ -26,7 +26,7 @@ export default function AccountDetailPage() {
     enabled: Boolean(accountId),
   });
 
-  const listings = accountQuery.data?.listings ?? [];
+  const listings = useMemo(() => accountQuery.data?.listings ?? [], [accountQuery.data?.listings]);
 
   const analytics = useMemo(() => {
     if (!listings.length) {

@@ -16,13 +16,13 @@ export function AccountList({ accounts, selectedAccountId, onSelect, onClear, is
       <div className="absolute -right-14 top-0 h-28 w-28 rounded-full bg-brand-500/10 blur-3xl" aria-hidden />
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold text-white">Accounts</h2>
-          <p className="text-xs text-slate-400">Switch storefronts instantly to align inventory and payments.</p>
+          <h2 className="text-base font-semibold text-white">Boutiques</h2>
+          <p className="text-xs text-slate-400">Select a storefront to browse its drop-ready inventory.</p>
         </div>
         <button
           type="button"
           onClick={onClear}
-          className="rounded-full border border-slate-700/60 px-3 py-1 text-xs font-medium text-slate-300 transition hover:border-brand-400/40 hover:text-white"
+          className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-xs font-medium text-white transition hover:-translate-y-[1px] hover:border-white/40 hover:bg-white/10"
         >
           Clear
         </button>
