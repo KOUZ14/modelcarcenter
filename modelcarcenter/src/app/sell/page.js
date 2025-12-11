@@ -47,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { isLoggedIn, getUserData, getAuthHeaders } from '@/lib/auth';
 
 export default function SellPage() {
   const router = useRouter();
@@ -68,33 +69,28 @@ export default function SellPage() {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (!token || !userData) {
+    if (!isLoggedIn()) {
       setLoading(false);
       return;
     }
     
-    const parsedUser = JSON.parse(userData);
-    setUser(parsedUser);
+    const userData = getUserData();
+    setUser(userData);
     
-    if (parsedUser.account_type === 'shop') {
-      fetchSellerAccount(token, parsedUser);
+    if (userData && userData.account_type === 'shop') {
+      fetchSellerAccount(userData);
     } else {
       setLoading(false);
     }
   }, []);
 
-  const fetchSellerAccount = async (token, userData) => {
+  const fetchSellerAccount = async (userData) => {
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
       
       // First, check if user has a seller account
       const accountsRes = await fetch(`${API_BASE}/accounts`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (accountsRes.ok) {
@@ -106,9 +102,7 @@ export default function SellPage() {
           
           // Fetch listings
           const listingsRes = await fetch(`${API_BASE}/accounts/${userAccount.id}/listings?include_listings=true`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
+            headers: getAuthHeaders(),
           });
           
           if (listingsRes.ok) {
@@ -127,16 +121,15 @@ export default function SellPage() {
   };
 
   const createSellerAccount = async () => {
-    const token = localStorage.getItem('token');
-    if (!token || !user) return;
+    if (!user) return;
 
     setSubmitting(true);
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
       const res = await fetch(`${API_BASE}/accounts`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          ...getAuthHeaders(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

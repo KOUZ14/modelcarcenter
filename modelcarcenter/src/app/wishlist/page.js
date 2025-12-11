@@ -11,7 +11,9 @@ import {
   ExternalLink, 
   Loader2,
   ShoppingBag,
-  ArrowLeft
+  ArrowLeft,
+  User,
+  LogOut
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -19,19 +21,26 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { 
+  isLoggedIn, 
+  getUserData, 
+  getAuthHeaders, 
+  clearSession,
+  getLocalWishlist,
+  removeFromLocalWishlist 
+} from '@/lib/auth';
 
-// Create alert dialog component inline since we might not have it
-const AlertDialogInline = ({ children, onConfirm, title, description }) => {
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+
+// Simple confirmation dialog
+const ConfirmDialog = ({ children, onConfirm, title, description }) => {
   const [open, setOpen] = useState(false);
   
   return (
@@ -64,37 +73,31 @@ export default function WishlistPage() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Check if user is logged in
-    const token = localStorage.getItem('token');
-    const userData = localStorage.getItem('user');
-    
-    if (!token || !userData) {
+    // Check if user is logged in using consistent auth
+    if (isLoggedIn()) {
+      const userData = getUserData();
+      setUser(userData);
+      fetchWishlist();
+    } else {
       // Use local storage wishlist for non-logged in users
-      const localWishlist = JSON.parse(localStorage.getItem('localWishlist') || '[]');
+      const localWishlist = getLocalWishlist();
       setWishlist(localWishlist);
       setLoading(false);
-      return;
     }
-    
-    setUser(JSON.parse(userData));
-    fetchWishlist(token);
   }, []);
 
-  const fetchWishlist = async (token) => {
+  const fetchWishlist = async () => {
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
       const res = await fetch(`${API_BASE}/wishlists`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (!res.ok) {
         if (res.status === 401) {
-          // Token expired, clear and show local wishlist
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          const localWishlist = JSON.parse(localStorage.getItem('localWishlist') || '[]');
+          // Token expired, clear session and show local wishlist
+          clearSession();
+          setUser(null);
+          const localWishlist = getLocalWishlist();
           setWishlist(localWishlist);
           setLoading(false);
           return;
@@ -113,23 +116,17 @@ export default function WishlistPage() {
   };
 
   const removeFromWishlist = async (item) => {
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
+    if (!isLoggedIn()) {
       // Remove from local storage
-      const newWishlist = wishlist.filter(w => w.link !== item.link);
+      const newWishlist = removeFromLocalWishlist(item.link);
       setWishlist(newWishlist);
-      localStorage.setItem('localWishlist', JSON.stringify(newWishlist));
       return;
     }
 
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
       const res = await fetch(`${API_BASE}/wishlists/${item.id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (res.ok) {
@@ -148,6 +145,13 @@ export default function WishlistPage() {
     return url;
   };
 
+  const handleLogout = () => {
+    clearSession();
+    setUser(null);
+    setWishlist(getLocalWishlist());
+    router.push('/');
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -163,9 +167,31 @@ export default function WishlistPage() {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             {user ? (
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/profile">Profile</Link>
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <span className="hidden sm:inline">{user.username}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard">Dashboard</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/wishlist">My Wishlist</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-500">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             ) : (
               <Button size="sm" asChild>
                 <Link href="/login">Sign In</Link>
@@ -252,7 +278,7 @@ export default function WishlistPage() {
                     fill
                     className="object-cover"
                   />
-                  <AlertDialogInline
+                  <ConfirmDialog
                     title="Remove from wishlist?"
                     description="This item will be removed from your wishlist."
                     onConfirm={() => removeFromWishlist(item)}
@@ -264,7 +290,7 @@ export default function WishlistPage() {
                     >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
-                  </AlertDialogInline>
+                  </ConfirmDialog>
                 </div>
                 <CardContent className="p-4">
                   <h3 className="font-medium line-clamp-2 mb-2">{item.title}</h3>

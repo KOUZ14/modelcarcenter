@@ -15,7 +15,9 @@ import {
   Loader2,
   Grid3X3,
   List,
-  ArrowLeft
+  ArrowLeft,
+  User,
+  LogOut
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -39,10 +41,25 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { 
+  getAuthToken, 
+  getUserData, 
+  isLoggedIn, 
+  clearSession,
+  getLocalWishlist,
+  addToLocalWishlist,
+  removeFromLocalWishlist,
+  isInLocalWishlist,
+  getAuthHeaders
+} from '@/lib/auth';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
 
 function SearchPageContent() {
   const searchParams = useSearchParams();
@@ -58,6 +75,7 @@ function SearchPageContent() {
   const [viewMode, setViewMode] = useState('grid');
   const [currentPage, setCurrentPage] = useState(1);
   const [wishlist, setWishlist] = useState([]);
+  const [user, setUser] = useState(null);
   const itemsPerPage = 12;
 
   // Filter states
@@ -68,12 +86,36 @@ function SearchPageContent() {
   const scales = ['1:18', '1:24', '1:43', '1:64'];
   const brands = ['Ferrari', 'Porsche', 'Lamborghini', 'McLaren', 'BMW', 'Mercedes', 'Audi'];
 
+  // Load user session and wishlist on mount
+  useEffect(() => {
+    if (isLoggedIn()) {
+      setUser(getUserData());
+      fetchWishlist();
+    } else {
+      setWishlist(getLocalWishlist());
+    }
+  }, []);
+
   // Search on initial load if query exists
   useEffect(() => {
     if (initialQuery) {
       handleSearch(initialQuery);
     }
   }, [initialQuery]);
+
+  const fetchWishlist = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/wishlists`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWishlist(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch wishlist:', err);
+    }
+  };
 
   const handleSearch = async (searchQuery = query) => {
     if (!searchQuery.trim()) return;
@@ -84,7 +126,6 @@ function SearchPageContent() {
     setCurrentPage(1);
 
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
       const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(searchQuery)}`);
       const data = await res.json();
 
@@ -110,17 +151,66 @@ function SearchPageContent() {
     }
   };
 
-  const toggleWishlist = (car) => {
-    setWishlist(prev => {
-      const exists = prev.find(item => item.link === car.link);
-      if (exists) {
-        return prev.filter(item => item.link !== car.link);
+  const toggleWishlist = async (car) => {
+    const inWishlist = isInWishlistCheck(car);
+    
+    if (isLoggedIn()) {
+      // Handle logged-in user wishlist via API
+      try {
+        if (inWishlist) {
+          // Find the wishlist item to remove
+          const wishlistItem = wishlist.find(item => item.link === car.link);
+          if (wishlistItem && wishlistItem.id) {
+            await fetch(`${API_BASE}/wishlists/${wishlistItem.id}`, {
+              method: 'DELETE',
+              headers: getAuthHeaders(),
+            });
+            setWishlist(prev => prev.filter(item => item.link !== car.link));
+          }
+        } else {
+          // Add to wishlist
+          const res = await fetch(`${API_BASE}/wishlists`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...getAuthHeaders(),
+            },
+            body: JSON.stringify({
+              title: car.title,
+              link: car.link,
+              image: car.image,
+              price: car.price,
+              source: car.source || 'eBay',
+            }),
+          });
+          
+          if (res.ok) {
+            const newItem = await res.json();
+            setWishlist(prev => [...prev, newItem]);
+          }
+        }
+      } catch (err) {
+        console.error('Wishlist error:', err);
       }
-      return [...prev, car];
-    });
+    } else {
+      // Handle local wishlist for non-logged-in users
+      if (inWishlist) {
+        const newWishlist = removeFromLocalWishlist(car.link);
+        setWishlist(newWishlist);
+      } else {
+        const newWishlist = addToLocalWishlist({
+          title: car.title,
+          link: car.link,
+          image: car.image,
+          price: car.price,
+          source: car.source || 'eBay',
+        });
+        setWishlist(newWishlist);
+      }
+    }
   };
 
-  const isInWishlist = (car) => {
+  const isInWishlistCheck = (car) => {
     return wishlist.some(item => item.link === car.link);
   };
 
@@ -130,6 +220,13 @@ function SearchPageContent() {
       return 'https:' + url;
     }
     return url;
+  };
+
+  const handleLogout = () => {
+    clearSession();
+    setUser(null);
+    setWishlist(getLocalWishlist());
+    router.push('/');
   };
 
   // Filtering logic
@@ -142,6 +239,51 @@ function SearchPageContent() {
       const min = priceRange.min ? parseFloat(priceRange.min) : 0;
       const max = priceRange.max ? parseFloat(priceRange.max) : Infinity;
       return price >= min && price <= max;
+    });
+  }
+
+  // Apply scale filter
+  if (selectedScales.length > 0) {
+    filteredCars = filteredCars.filter(car => {
+      const title = (car.title || '').toLowerCase();
+      return selectedScales.some(scale => {
+        // Match various scale formats: 1:18, 1/18, 1-18
+        const scaleNum = scale.split(':')[1];
+        const patterns = [
+          `1:${scaleNum}`,
+          `1/${scaleNum}`,
+          `1-${scaleNum}`,
+          `1 ${scaleNum}`,
+        ];
+        return patterns.some(p => title.includes(p.toLowerCase()));
+      });
+    });
+  }
+
+  // Apply brand filter
+  if (selectedBrands.length > 0) {
+    filteredCars = filteredCars.filter(car => {
+      const title = (car.title || '').toLowerCase();
+      const description = (car.description || '').toLowerCase();
+      const searchText = `${title} ${description}`;
+      
+      return selectedBrands.some(brand => {
+        const brandLower = brand.toLowerCase();
+        // Check for brand name in title or description
+        // Also check for common variations
+        const variations = [brandLower];
+        
+        // Add common brand variations
+        if (brandLower === 'mercedes') {
+          variations.push('mercedes-benz', 'mercedes benz', 'amg');
+        } else if (brandLower === 'bmw') {
+          variations.push('b.m.w', 'b.m.w.');
+        } else if (brandLower === 'mclaren') {
+          variations.push('mc laren');
+        }
+        
+        return variations.some(v => searchText.includes(v));
+      });
     });
   }
 
@@ -175,6 +317,9 @@ function SearchPageContent() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // Active filters count
+  const activeFiltersCount = selectedScales.length + selectedBrands.length + (priceRange.min || priceRange.max ? 1 : 0);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -205,13 +350,42 @@ function SearchPageContent() {
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" asChild>
               <Link href="/wishlist">
-                <Heart className="h-5 w-5" />
+                <Heart className={cn("h-5 w-5", wishlist.length > 0 && "fill-red-500 text-red-500")} />
               </Link>
             </Button>
             <ThemeToggle />
-            <Button size="sm" asChild>
-              <Link href="/login">Sign In</Link>
-            </Button>
+            
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <span className="hidden sm:inline">{user.username}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel>{user.email}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard">Dashboard</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/wishlist">My Wishlist</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-500">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button size="sm" asChild>
+                <Link href="/login">Sign In</Link>
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -282,6 +456,9 @@ function SearchPageContent() {
             >
               <Filter className="h-4 w-4 mr-2" />
               Filters
+              {activeFiltersCount > 0 && (
+                <Badge variant="secondary" className="ml-2">{activeFiltersCount}</Badge>
+              )}
             </Button>
           </div>
         </div>
@@ -291,7 +468,12 @@ function SearchPageContent() {
           <aside className="hidden lg:block w-64 flex-shrink-0">
             <Card>
               <CardContent className="p-4">
-                <h3 className="font-semibold mb-4">Filters</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">Filters</h3>
+                  {activeFiltersCount > 0 && (
+                    <Badge variant="secondary">{activeFiltersCount} active</Badge>
+                  )}
+                </div>
 
                 {/* Price Range */}
                 <div className="mb-6">
@@ -332,6 +514,7 @@ function SearchPageContent() {
                             } else {
                               setSelectedScales(selectedScales.filter(s => s !== scale));
                             }
+                            setCurrentPage(1); // Reset to first page when filter changes
                           }}
                         />
                         <Label htmlFor={`scale-${scale}`} className="text-sm font-normal cursor-pointer">
@@ -359,6 +542,7 @@ function SearchPageContent() {
                             } else {
                               setSelectedBrands(selectedBrands.filter(b => b !== brand));
                             }
+                            setCurrentPage(1); // Reset to first page when filter changes
                           }}
                         />
                         <Label htmlFor={`brand-${brand}`} className="text-sm font-normal cursor-pointer">
@@ -376,7 +560,9 @@ function SearchPageContent() {
                     setSelectedScales([]);
                     setSelectedBrands([]);
                     setPriceRange({ min: '', max: '' });
+                    setCurrentPage(1);
                   }}
+                  disabled={activeFiltersCount === 0}
                 >
                   Clear Filters
                 </Button>
@@ -399,7 +585,7 @@ function SearchPageContent() {
                   </Button>
                 </div>
                 <ScrollArea className="h-[calc(100vh-60px)] p-4">
-                  {/* Same filter content as desktop */}
+                  {/* Price Range */}
                   <div className="mb-6">
                     <Label className="text-sm font-medium mb-2 block">Price Range</Label>
                     <div className="flex items-center gap-2">
@@ -421,6 +607,7 @@ function SearchPageContent() {
 
                   <Separator className="my-4" />
 
+                  {/* Scale Filter */}
                   <div className="mb-6">
                     <Label className="text-sm font-medium mb-2 block">Scale</Label>
                     <div className="space-y-2">
@@ -445,11 +632,50 @@ function SearchPageContent() {
                     </div>
                   </div>
 
+                  <Separator className="my-4" />
+
+                  {/* Brand Filter */}
+                  <div className="mb-6">
+                    <Label className="text-sm font-medium mb-2 block">Brand</Label>
+                    <div className="space-y-2">
+                      {brands.map((brand) => (
+                        <div key={brand} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`mobile-brand-${brand}`}
+                            checked={selectedBrands.includes(brand)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedBrands([...selectedBrands, brand]);
+                              } else {
+                                setSelectedBrands(selectedBrands.filter(b => b !== brand));
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`mobile-brand-${brand}`} className="text-sm font-normal">
+                            {brand}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <Button
                     className="w-full"
                     onClick={() => setShowFilters(false)}
                   >
                     Apply Filters
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    className="w-full mt-2"
+                    onClick={() => {
+                      setSelectedScales([]);
+                      setSelectedBrands([]);
+                      setPriceRange({ min: '', max: '' });
+                    }}
+                  >
+                    Clear Filters
                   </Button>
                 </ScrollArea>
               </div>
@@ -492,8 +718,23 @@ function SearchPageContent() {
                   </div>
                   <h3 className="text-xl font-semibold mb-2">No results found</h3>
                   <p className="text-muted-foreground mb-6">
-                    We couldn&apos;t find any model cars matching &quot;{initialQuery}&quot;
+                    {activeFiltersCount > 0 
+                      ? 'Try adjusting your filters or search terms'
+                      : `We couldn't find any model cars matching "${initialQuery}"`}
                   </p>
+                  {activeFiltersCount > 0 && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedScales([]);
+                        setSelectedBrands([]);
+                        setPriceRange({ min: '', max: '' });
+                      }}
+                      className="mb-4"
+                    >
+                      Clear All Filters
+                    </Button>
+                  )}
                   <div className="flex flex-wrap justify-center gap-2">
                     {['Ferrari 488', 'Porsche 911', 'McLaren P1'].map((term) => (
                       <Button
@@ -551,7 +792,7 @@ function SearchPageContent() {
                           <Heart
                             className={cn(
                               "h-4 w-4",
-                              isInWishlist(car) && "fill-red-500 text-red-500"
+                              isInWishlistCheck(car) && "fill-red-500 text-red-500"
                             )}
                           />
                         </Button>

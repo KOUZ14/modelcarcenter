@@ -35,6 +35,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { isLoggedIn, getUserData, clearSession } from '@/lib/auth';
 
 export default function Home() {
   const router = useRouter();
@@ -44,6 +45,8 @@ export default function Home() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [user, setUser] = useState(null);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const searchInputRef = useRef(null);
 
   // Popular search suggestions
@@ -73,16 +76,41 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
-    // Check if user is logged in
-    const userData = localStorage.getItem('user_data');
-    if (userData) {
-      setUser(JSON.parse(userData));
+    // Check if user is logged in using consistent auth
+    if (isLoggedIn()) {
+      setUser(getUserData());
     }
+    
+    // Fetch featured products from eBay
+    const fetchFeaturedProducts = async () => {
+      try {
+        setLoadingProducts(true);
+        const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+        const searchTerms = ['ferrari diecast', 'porsche diecast', 'lamborghini diecast', 'bmw diecast'];
+        const randomSearch = searchTerms[Math.floor(Math.random() * searchTerms.length)];
+        
+        const response = await fetch(
+          `${API_BASE}/search?q=${encodeURIComponent(randomSearch)}&limit=4`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.results && data.results.length > 0) {
+            setFeaturedProducts(data.results.slice(0, 4));
+          }
+        }
+      } catch (error) {
+        console.log('Error fetching featured products:', error);
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+    
+    fetchFeaturedProducts();
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_data');
+    clearSession();
     setUser(null);
     router.refresh();
   };
@@ -277,7 +305,10 @@ export default function Home() {
                       {suggestions.map((suggestion, idx) => (
                         <button
                           key={idx}
-                          onClick={() => handleSearch(suggestion.term)}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSearch(suggestion.term);
+                          }}
                           className="w-full flex items-center justify-between px-3 py-2 rounded-md hover:bg-accent text-left transition-colors"
                         >
                           <span className="flex items-center gap-2">
@@ -301,7 +332,10 @@ export default function Home() {
                             key={idx}
                             variant="secondary"
                             size="sm"
-                            onClick={() => handleSearch(search.term)}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handleSearch(search.term);
+                            }}
                             className="text-sm"
                           >
                             {search.term}
@@ -475,57 +509,75 @@ export default function Home() {
             {/* Featured Cards Preview */}
             <div className="relative">
               <div className="grid grid-cols-2 gap-4">
-                <Card className="card-hover">
-                  <div className="aspect-square relative bg-muted rounded-t-lg overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Car className="h-16 w-16 text-muted-foreground/30" />
-                    </div>
-                  </div>
-                  <CardContent className="p-4">
-                    <p className="font-medium text-sm line-clamp-2">Ferrari 488 GTB 1:18 Scale</p>
-                    <p className="text-primary font-bold mt-1">$149.99</p>
-                    <Badge variant="secondary" className="mt-2 text-xs">eBay</Badge>
-                  </CardContent>
-                </Card>
-
-                <Card className="card-hover mt-8">
-                  <div className="aspect-square relative bg-muted rounded-t-lg overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Car className="h-16 w-16 text-muted-foreground/30" />
-                    </div>
-                  </div>
-                  <CardContent className="p-4">
-                    <p className="font-medium text-sm line-clamp-2">Porsche 911 GT3 RS 1:64</p>
-                    <p className="text-primary font-bold mt-1">$24.99</p>
-                    <Badge variant="secondary" className="mt-2 text-xs">Tarmac Works</Badge>
-                  </CardContent>
-                </Card>
-
-                <Card className="card-hover -mt-4">
-                  <div className="aspect-square relative bg-muted rounded-t-lg overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Car className="h-16 w-16 text-muted-foreground/30" />
-                    </div>
-                  </div>
-                  <CardContent className="p-4">
-                    <p className="font-medium text-sm line-clamp-2">McLaren P1 Limited Edition</p>
-                    <p className="text-primary font-bold mt-1">$299.00</p>
-                    <Badge variant="secondary" className="mt-2 text-xs">Fairfield</Badge>
-                  </CardContent>
-                </Card>
-
-                <Card className="card-hover mt-4">
-                  <div className="aspect-square relative bg-muted rounded-t-lg overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Car className="h-16 w-16 text-muted-foreground/30" />
-                    </div>
-                  </div>
-                  <CardContent className="p-4">
-                    <p className="font-medium text-sm line-clamp-2">Lamborghini Aventador SVJ</p>
-                    <p className="text-primary font-bold mt-1">$89.99</p>
-                    <Badge variant="secondary" className="mt-2 text-xs">Model Cars Houston</Badge>
-                  </CardContent>
-                </Card>
+                {loadingProducts || featuredProducts.length === 0 ? (
+                  // Loading/fallback placeholders
+                  <>
+                    {[
+                      { title: 'Ferrari 488 GTB 1:18 Scale', price: '$149.99', seller: 'eBay' },
+                      { title: 'Porsche 911 GT3 RS 1:64', price: '$24.99', seller: 'Tarmac Works' },
+                      { title: 'McLaren P1 Limited Edition', price: '$299.00', seller: 'Fairfield' },
+                      { title: 'Lamborghini Aventador SVJ', price: '$89.99', seller: 'Model Cars Houston' }
+                    ].map((item, idx) => (
+                      <Card key={idx} className={cn("card-hover", idx === 1 && "mt-8", idx === 2 && "-mt-4", idx === 3 && "mt-4")}>
+                        <div className="aspect-square relative bg-muted rounded-t-lg overflow-hidden animate-pulse">
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Car className="h-16 w-16 text-muted-foreground/30" />
+                          </div>
+                        </div>
+                        <CardContent className="p-4">
+                          <p className="font-medium text-sm line-clamp-2">{item.title}</p>
+                          <p className="text-primary font-bold mt-1">{item.price}</p>
+                          <Badge variant="secondary" className="mt-2 text-xs">{item.seller}</Badge>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </>
+                ) : (
+                  // Actual products from eBay
+                  featuredProducts.map((product, idx) => (
+                    <Card 
+                      key={product.item_id || idx} 
+                      className={cn(
+                        "card-hover cursor-pointer transition-transform hover:scale-105", 
+                        idx === 1 && "mt-8", 
+                        idx === 2 && "-mt-4", 
+                        idx === 3 && "mt-4"
+                      )}
+                      onClick={() => window.open(product.item_url, '_blank')}
+                    >
+                      <div className="aspect-square relative bg-muted rounded-t-lg overflow-hidden">
+                        {product.image_url ? (
+                          <img 
+                            src={product.image_url} 
+                            alt={product.title}
+                            className="object-cover w-full h-full"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
+                          />
+                        ) : null}
+                        <div 
+                          className={cn(
+                            "absolute inset-0 items-center justify-center",
+                            product.image_url ? "hidden" : "flex"
+                          )}
+                        >
+                          <Car className="h-16 w-16 text-muted-foreground/30" />
+                        </div>
+                      </div>
+                      <CardContent className="p-4">
+                        <p className="font-medium text-sm line-clamp-2">{product.title}</p>
+                        <p className="text-primary font-bold mt-1">
+                          {product.price ? `$${parseFloat(product.price).toFixed(2)}` : 'Price N/A'}
+                        </p>
+                        <Badge variant="secondary" className="mt-2 text-xs">
+                          {product.seller_name || product.source || 'eBay'}
+                        </Badge>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
             </div>
           </div>

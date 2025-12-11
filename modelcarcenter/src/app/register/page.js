@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Car, Eye, EyeOff, Loader2, Store, User } from 'lucide-react';
@@ -11,6 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
+import { saveSession, isLoggedIn } from '@/lib/auth';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -25,6 +28,13 @@ export default function RegisterPage() {
     confirmPassword: '',
     accountType: 'collector',
   });
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isLoggedIn()) {
+      router.push('/dashboard');
+    }
+  }, [router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -49,7 +59,6 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
       const res = await fetch(`${API_BASE}/users/register`, {
         method: 'POST',
         headers: {
@@ -71,9 +80,8 @@ export default function RegisterPage() {
         return;
       }
 
-      // Store token and user data
-      localStorage.setItem('auth_token', data.token);
-      localStorage.setItem('user_data', JSON.stringify(data.user));
+      // Store token and user data using shared auth utility
+      saveSession(data.token, data.user);
       
       // Redirect to dashboard
       router.push('/dashboard');

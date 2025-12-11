@@ -28,6 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { isLoggedIn, getUserData, getAuthHeaders } from '@/lib/auth';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
 
@@ -62,24 +63,20 @@ export default function MessagesPage() {
   }, [messages]);
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    const userData = localStorage.getItem('user_data');
-    
-    if (!token || !userData) {
+    if (!isLoggedIn()) {
       router.push('/login');
       return;
     }
     
-    setUser(JSON.parse(userData));
-    fetchThreads(token);
+    setUser(getUserData());
+    fetchThreads();
   }, [router]);
 
-  const fetchThreads = async (token) => {
+  const fetchThreads = async () => {
     try {
+      setLoading(true);
       const response = await fetch(`${API_BASE}/messages/threads`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
       
       if (response.ok) {
@@ -91,10 +88,12 @@ export default function MessagesPage() {
           setThreads(getDemoThreads());
         }
       } else {
+        // API returned error, use demo data
         setThreads(getDemoThreads());
       }
     } catch (error) {
-      console.error('Error fetching threads:', error);
+      // Network error or API unreachable - use demo threads silently
+      console.log('Messages API unavailable, using demo data');
       setThreads(getDemoThreads());
     } finally {
       setLoading(false);
@@ -129,8 +128,6 @@ export default function MessagesPage() {
   ];
 
   const fetchMessages = async (threadId) => {
-    const token = localStorage.getItem('auth_token');
-    
     // For demo threads, return demo messages
     if (threadId.startsWith('demo')) {
       setMessages(getDemoMessages(threadId));
@@ -139,9 +136,7 @@ export default function MessagesPage() {
 
     try {
       const response = await fetch(`${API_BASE}/messages/threads/${threadId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: getAuthHeaders()
       });
       
       if (response.ok) {
@@ -230,13 +225,12 @@ export default function MessagesPage() {
       }, 1500 + Math.random() * 2000);
     } else {
       // Real API call
-      const token = localStorage.getItem('auth_token');
       try {
         await fetch(`${API_BASE}/messages/send`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
+            ...getAuthHeaders()
           },
           body: JSON.stringify({
             thread_id: selectedThread.id,

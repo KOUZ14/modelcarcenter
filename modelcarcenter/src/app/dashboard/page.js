@@ -34,6 +34,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { isLoggedIn, getUserData, getAuthToken, clearSession, getAuthHeaders } from '@/lib/auth';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
 
@@ -50,41 +51,47 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
-    const userData = localStorage.getItem('user_data');
-    
-    if (!token || !userData) {
+    if (!isLoggedIn()) {
       router.push('/login');
       return;
     }
     
-    const parsedUser = JSON.parse(userData);
-    setUser(parsedUser);
-    fetchDashboardData(token);
+    const userData = getUserData();
+    setUser(userData);
+    fetchDashboardData();
   }, [router]);
 
-  const fetchDashboardData = async (token) => {
+  const fetchDashboardData = async () => {
     try {
       // Fetch wishlist count
-      const wishlistRes = await fetch(`${API_BASE}/wishlists`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
       let wishlistCount = 0;
-      if (wishlistRes.ok) {
-        const wishlistData = await wishlistRes.json();
-        wishlistCount = wishlistData.items?.length || 0;
+      try {
+        const wishlistRes = await fetch(`${API_BASE}/wishlists`, {
+          headers: getAuthHeaders()
+        });
+        
+        if (wishlistRes.ok) {
+          const wishlistData = await wishlistRes.json();
+          // The API returns an array directly, not an object with items
+          wishlistCount = Array.isArray(wishlistData) ? wishlistData.length : (wishlistData.items?.length || 0);
+        }
+      } catch (wishlistError) {
+        console.log('Wishlist fetch error (non-critical):', wishlistError.message);
       }
 
       // Fetch messages count
-      const messagesRes = await fetch(`${API_BASE}/messages/threads`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
       let messagesCount = 0;
-      if (messagesRes.ok) {
-        const messagesData = await messagesRes.json();
-        messagesCount = messagesData.threads?.filter(t => t.unreadCount > 0).length || 0;
+      try {
+        const messagesRes = await fetch(`${API_BASE}/messages/threads`, {
+          headers: getAuthHeaders()
+        });
+        
+        if (messagesRes.ok) {
+          const messagesData = await messagesRes.json();
+          messagesCount = messagesData.threads?.filter(t => t.unreadCount > 0).length || 0;
+        }
+      } catch (messagesError) {
+        console.log('Messages fetch error (non-critical):', messagesError.message);
       }
 
       // Get recent searches from localStorage
@@ -112,8 +119,7 @@ export default function DashboardPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user_data');
+    clearSession();
     router.push('/');
   };
 
