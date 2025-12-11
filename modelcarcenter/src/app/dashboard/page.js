@@ -58,6 +58,13 @@ export default function DashboardPage() {
     
     const userData = getUserData();
     setUser(userData);
+    
+    // Redirect sellers to the sell page (their dashboard)
+    if (userData?.account_type === 'shop') {
+      router.push('/sell');
+      return;
+    }
+    
     fetchDashboardData();
   }, [router]);
 

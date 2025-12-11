@@ -100,14 +100,15 @@ export default function SellPage() {
         if (userAccount) {
           setAccount(userAccount);
           
-          // Fetch listings
-          const listingsRes = await fetch(`${API_BASE}/accounts/${userAccount.id}/listings?include_listings=true`, {
+          // Fetch listings - the endpoint returns an array directly
+          const listingsRes = await fetch(`${API_BASE}/accounts/${userAccount.id}/listings`, {
             headers: getAuthHeaders(),
           });
           
           if (listingsRes.ok) {
-            const accountData = await listingsRes.json();
-            setListings(accountData.listings || []);
+            const listingsData = await listingsRes.json();
+            // API returns array directly
+            setListings(Array.isArray(listingsData) ? listingsData : []);
           }
         }
       }
@@ -155,17 +156,14 @@ export default function SellPage() {
 
   const createListing = async () => {
     if (!account) return;
-    
-    const token = localStorage.getItem('token');
-    if (!token) return;
 
     setSubmitting(true);
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
       const res = await fetch(`${API_BASE}/accounts/${account.id}/listings`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          ...getAuthHeaders(),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -202,17 +200,12 @@ export default function SellPage() {
 
   const deleteListing = async (listingId) => {
     if (!account) return;
-    
-    const token = localStorage.getItem('token');
-    if (!token) return;
 
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE;
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
       const res = await fetch(`${API_BASE}/accounts/${account.id}/listings/${listingId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
       });
 
       if (res.ok) {
