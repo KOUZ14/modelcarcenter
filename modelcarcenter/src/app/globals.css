@@ -1,26 +1,114 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light dark;
+  --background: 15 23 42;
+  --foreground: 226 232 240;
+  --card: 21 30 60;
+  --card-foreground: 241 245 249;
+  --border: 51 65 85;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.light {
+  color-scheme: light;
+  --background: 248 250 252;
+  --foreground: 15 23 42;
+  --card: 255 255 255;
+  --card-foreground: 15 23 42;
+  --border: 226 232 240;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: radial-gradient(circle at 10% 20%, rgba(59, 130, 246, 0.12) 0%, transparent 55%),
+    radial-gradient(circle at 90% 10%, rgba(244, 113, 181, 0.18) 0%, transparent 45%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+  color: rgb(var(--foreground));
+  position: relative;
+  overflow-x: hidden;
+  @apply min-h-screen font-sans antialiased;
+}
+
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: auto -25vw 20vh;
+  width: 70vw;
+  aspect-ratio: 1 / 1;
+  z-index: -1;
+  border-radius: 999px;
+  filter: blur(120px);
+  opacity: 0.5;
+}
+
+body::before {
+  top: -30vh;
+  right: 10vw;
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, transparent 65%);
+}
+
+body::after {
+  bottom: -20vh;
+  left: 0;
+  background: radial-gradient(circle, rgba(244, 113, 181, 0.2) 0%, transparent 60%);
+}
+
+.card-surface {
+  @apply rounded-3xl border border-slate-800/60 bg-slate-900/75 p-6 shadow-card transition duration-200 ease-out;
+  backdrop-filter: blur(22px);
+  background-image: linear-gradient(140deg, rgba(15, 23, 42, 0.65) 0%, rgba(15, 23, 42, 0.35) 100%),
+    linear-gradient(120deg, rgba(59, 130, 246, 0.12), rgba(244, 113, 181, 0.08));
+  border-image: linear-gradient(160deg, rgba(59, 130, 246, 0.35), rgba(244, 113, 181, 0.2)) 1;
+}
+
+.card-surface.light {
+  @apply border-slate-200/80 bg-white;
+}
+
+.heading {
+  @apply text-lg font-semibold text-slate-100;
+}
+
+.text-muted {
+  @apply text-sm text-slate-400;
+}
+
+.chip {
+  @apply inline-flex items-center gap-1 rounded-full bg-white/5 px-3 py-1 text-xs font-medium text-slate-200 backdrop-blur;
+}
+
+.marketplace-divider {
+  background: linear-gradient(90deg, rgba(59, 130, 246, 0) 0%, rgba(59, 130, 246, 0.4) 50%, rgba(244, 113, 181, 0) 100%);
+  height: 1px;
+  width: 100%;
+}
+
+.glow-ring {
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.15), 0 5px 30px -10px rgba(59, 130, 246, 0.45);
+}
+
+.badge-pill {
+  @apply inline-flex items-center rounded-full border border-brand-400/40 bg-brand-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-200;
+}
+
+.soft-grid {
+  background-image: radial-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  @apply outline-none ring-2 ring-brand-400/70 ring-offset-2 ring-offset-slate-950;
+}
+
+[data-dialog-overlay] {
+  @apply fixed inset-0 bg-slate-950/70 backdrop-blur;
+}
+
+[data-dialog-content] {
+  @apply z-50 w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900/95 p-6 shadow-xl;
 }
