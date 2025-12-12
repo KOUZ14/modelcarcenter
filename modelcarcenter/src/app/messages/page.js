@@ -20,15 +20,19 @@ import {
   CheckCheck,
   Package,
   MoreVertical,
-  Smile
+  Smile,
+  Heart,
+  LogOut
 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { isLoggedIn, getUserData, getAuthHeaders } from '@/lib/auth';
+import { isLoggedIn, getUserData, getAuthHeaders, clearSession } from '@/lib/auth';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
 
@@ -75,16 +79,34 @@ export default function MessagesPage() {
   const fetchThreads = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/messages/threads`, {
+      const response = await fetch(`${API_BASE}/messages/conversations`, {
         headers: getAuthHeaders()
       });
       
       if (response.ok) {
         const data = await response.json();
-        if (data.threads && data.threads.length > 0) {
-          setThreads(data.threads);
+        // API returns an array of conversations
+        if (Array.isArray(data) && data.length > 0) {
+          // Transform API response to match our thread format
+          const transformedThreads = data.map(conv => ({
+            id: conv.id,
+            participant: {
+              id: conv.other_user?.id,
+              username: conv.other_user?.username || 'Unknown User',
+              avatar: conv.other_user?.avatar_url
+            },
+            listing: null, // Conversations don't necessarily have listings
+            lastMessage: conv.last_message ? {
+              text: conv.last_message.content,
+              timestamp: conv.last_message.created_at,
+              read: conv.unread_count === 0
+            } : { text: 'No messages yet', timestamp: conv.created_at, read: true },
+            unreadCount: conv.unread_count || 0,
+            isDemo: false
+          }));
+          setThreads(transformedThreads);
         } else {
-          // Demo threads if none exist
+          // No conversations, use demo data
           setThreads(getDemoThreads());
         }
       } else {
@@ -135,13 +157,21 @@ export default function MessagesPage() {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/messages/threads/${threadId}`, {
+      const response = await fetch(`${API_BASE}/messages/conversations/${threadId}/messages`, {
         headers: getAuthHeaders()
       });
       
       if (response.ok) {
         const data = await response.json();
-        setMessages(data.messages || []);
+        // Transform messages from API format
+        const transformedMessages = (data.messages || []).map(msg => ({
+          id: msg.id,
+          sender: msg.sender?.id === user?.id ? 'me' : 'other',
+          text: msg.content,
+          timestamp: msg.created_at,
+          read: !!msg.read_at
+        })).reverse(); // Reverse since API returns newest first
+        setMessages(transformedMessages);
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
@@ -224,19 +254,16 @@ export default function MessagesPage() {
         ));
       }, 1500 + Math.random() * 2000);
     } else {
-      // Real API call
+      // Real API call - use the correct endpoint
       try {
-        await fetch(`${API_BASE}/messages/send`, {
+        await fetch(`${API_BASE}/messages/conversations/${selectedThread.id}/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             ...getAuthHeaders()
           },
           body: JSON.stringify({
-            thread_id: selectedThread.id,
-            recipient_id: selectedThread.participant.id,
-            listing_id: selectedThread.listing?.id,
-            message: messageText
+            content: messageText
           })
         });
       } catch (error) {
@@ -292,19 +319,79 @@ export default function MessagesPage() {
           
           <nav className="flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard">Dashboard</Link>
+              <Link href="/search">Browse</Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/search">Browse</Link>
+              <Link href="/wishlist">
+                <Heart className="h-4 w-4 mr-1" />
+                Wishlist
+              </Link>
             </Button>
             <ThemeToggle />
             {user && (
-              <div className="flex items-center gap-2 ml-2">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                  <User className="h-4 w-4" />
-                </div>
-                <span className="text-sm font-medium hidden sm:inline">{user.username}</span>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <span className="hidden sm:inline">{user.username}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col">
+                      <span>{user.username}</span>
+                      <span className="text-xs text-muted-foreground font-normal">{user.email}</span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard" className="cursor-pointer">
+                      <User className="h-4 w-4 mr-2" />
+                      Dashboard
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/wishlist" className="cursor-pointer">
+                      <Heart className="h-4 w-4 mr-2" />
+                      Wishlist
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/messages" className="cursor-pointer">
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Messages
+                    </Link>
+                  </DropdownMenuItem>
+                  {user.account_type === 'shop' ? (
+                    <DropdownMenuItem asChild>
+                      <Link href="/sell" className="cursor-pointer">
+                        <Package className="h-4 w-4 mr-2" />
+                        My Listings
+                      </Link>
+                    </DropdownMenuItem>
+                  ) : (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/sell" className="cursor-pointer">
+                          <Package className="h-4 w-4 mr-2" />
+                          Open Sell Account
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => { clearSession(); window.location.href = '/'; }} 
+                    className="cursor-pointer text-red-500"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </nav>
         </div>
@@ -362,9 +449,9 @@ export default function MessagesPage() {
                             {thread.participant.username.charAt(0).toUpperCase()}
                           </span>
                         </div>
-                        <div className="flex-1 min-w-0">
+                        <div className="flex-1 overflow-hidden">
                           <div className="flex items-center justify-between mb-1">
-                            <span className={`font-medium truncate ${thread.unreadCount > 0 ? 'text-foreground' : ''}`}>
+                            <span className={`font-medium truncate flex-1 ${thread.unreadCount > 0 ? 'text-foreground' : ''}`}>
                               {thread.participant.username}
                             </span>
                             <span className="text-xs text-muted-foreground flex-shrink-0 ml-2">
@@ -373,16 +460,16 @@ export default function MessagesPage() {
                           </div>
                           {thread.listing && (
                             <p className="text-xs text-primary truncate mb-1 flex items-center gap-1">
-                              <Package className="h-3 w-3" />
-                              {thread.listing.title}
+                              <Package className="h-3 w-3 flex-shrink-0" />
+                              <span className="truncate">{thread.listing.title}</span>
                             </p>
                           )}
-                          <div className="flex items-center justify-between">
-                            <p className={`text-sm truncate ${thread.unreadCount > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={`text-sm line-clamp-1 flex-1 ${thread.unreadCount > 0 ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
                               {thread.lastMessage.text}
                             </p>
                             {thread.unreadCount > 0 && (
-                              <Badge className="ml-2 h-5 min-w-5 flex items-center justify-center p-0 text-xs">
+                              <Badge className="h-5 min-w-[20px] flex items-center justify-center px-1.5 text-xs flex-shrink-0">
                                 {thread.unreadCount}
                               </Badge>
                             )}

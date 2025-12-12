@@ -66,7 +66,12 @@ export default function SellPage() {
     currency: 'USD',
     quantity: '1',
     sku: '',
+    image_url: '',
   });
+
+  const [editingListing, setEditingListing] = useState(null);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -214,6 +219,95 @@ export default function SellPage() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const startEditListing = (listing) => {
+    setEditingListing({
+      ...listing,
+      price: listing.price.toString(),
+      quantity: listing.quantity.toString(),
+    });
+    setShowEditDialog(true);
+  };
+
+  const updateListing = async () => {
+    if (!account || !editingListing) return;
+
+    setSubmitting(true);
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+      const res = await fetch(`${API_BASE}/accounts/${account.id}/listings/${editingListing.id}`, {
+        method: 'PUT',
+        headers: {
+          ...getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: editingListing.title,
+          description: editingListing.description,
+          price: parseFloat(editingListing.price),
+          currency: editingListing.currency,
+          quantity: parseInt(editingListing.quantity),
+          sku: editingListing.sku || null,
+          image_url: editingListing.image_url || null,
+        }),
+      });
+
+      if (res.ok) {
+        const updatedListing = await res.json();
+        setListings(listings.map(l => l.id === updatedListing.id ? updatedListing : l));
+        setShowEditDialog(false);
+        setEditingListing(null);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to update listing');
+      }
+    } catch (err) {
+      setError('Failed to update listing');
+    }
+    setSubmitting(false);
+  };
+
+  const handleImageUpload = async (file, isEdit = false) => {
+    if (!file || !file.type.startsWith('image/')) {
+      setError('Please select a valid image file');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result;
+        if (isEdit) {
+          setEditingListing({ ...editingListing, image_url: base64String });
+        } else {
+          setNewListing({ ...newListing, image_url: base64String });
+        }
+        setUploadingImage(false);
+      };
+      reader.onerror = () => {
+        setError('Failed to read image file');
+        setUploadingImage(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setError('Failed to upload image');
+      setUploadingImage(false);
+    }
+  };
+
+  const handleDrop = (e, isEdit = false) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      handleImageUpload(file, isEdit);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
   };
 
   // Not logged in
@@ -433,6 +527,36 @@ export default function SellPage() {
                         />
                       </div>
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="image">Product Image</Label>
+                      <div
+                        className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                        onDrop={(e) => handleDrop(e, false)}
+                        onDragOver={handleDragOver}
+                        onClick={() => document.getElementById('imageUpload').click()}
+                      >
+                        {uploadingImage ? (
+                          <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                        ) : newListing.image_url ? (
+                          <div className="space-y-2">
+                            <img src={newListing.image_url} alt="Preview" className="max-h-32 mx-auto rounded" />
+                            <p className="text-sm text-muted-foreground">Click or drag to replace</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Car className="h-8 w-8 mx-auto text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Click or drag image here</p>
+                          </div>
+                        )}
+                      </div>
+                      <input
+                        id="imageUpload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => e.target.files[0] && handleImageUpload(e.target.files[0], false)}
+                      />
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setShowNewListingDialog(false)}>
@@ -441,6 +565,126 @@ export default function SellPage() {
                     <Button onClick={createListing} disabled={submitting || !newListing.title || !newListing.price}>
                       {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                       Create Listing
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
+              {/* Edit Listing Dialog */}
+              <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Edit Listing</DialogTitle>
+                    <DialogDescription>
+                      Update your model car listing
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-title">Title</Label>
+                      <Input
+                        id="edit-title"
+                        placeholder="Ferrari 488 GTB 1:18 Scale"
+                        value={editingListing?.title || ''}
+                        onChange={(e) => setEditingListing({ ...editingListing, title: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-description">Description</Label>
+                      <Textarea
+                        id="edit-description"
+                        placeholder="Describe your model car..."
+                        value={editingListing?.description || ''}
+                        onChange={(e) => setEditingListing({ ...editingListing, description: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-price">Price</Label>
+                        <Input
+                          id="edit-price"
+                          type="number"
+                          placeholder="99.99"
+                          value={editingListing?.price || ''}
+                          onChange={(e) => setEditingListing({ ...editingListing, price: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-currency">Currency</Label>
+                        <Select
+                          value={editingListing?.currency || 'USD'}
+                          onValueChange={(value) => setEditingListing({ ...editingListing, currency: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="USD">USD</SelectItem>
+                            <SelectItem value="EUR">EUR</SelectItem>
+                            <SelectItem value="GBP">GBP</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-quantity">Quantity</Label>
+                        <Input
+                          id="edit-quantity"
+                          type="number"
+                          min="1"
+                          value={editingListing?.quantity || ''}
+                          onChange={(e) => setEditingListing({ ...editingListing, quantity: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-sku">SKU (Optional)</Label>
+                        <Input
+                          id="edit-sku"
+                          placeholder="SKU-001"
+                          value={editingListing?.sku || ''}
+                          onChange={(e) => setEditingListing({ ...editingListing, sku: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-image">Product Image</Label>
+                      <div
+                        className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                        onDrop={(e) => handleDrop(e, true)}
+                        onDragOver={handleDragOver}
+                        onClick={() => document.getElementById('editImageUpload').click()}
+                      >
+                        {uploadingImage ? (
+                          <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                        ) : editingListing?.image_url ? (
+                          <div className="space-y-2">
+                            <img src={editingListing.image_url} alt="Preview" className="max-h-32 mx-auto rounded" />
+                            <p className="text-sm text-muted-foreground">Click or drag to replace</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <Car className="h-8 w-8 mx-auto text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Click or drag image here</p>
+                          </div>
+                        )}
+                      </div>
+                      <input
+                        id="editImageUpload"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => e.target.files[0] && handleImageUpload(e.target.files[0], true)}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={updateListing} disabled={submitting || !editingListing?.title || !editingListing?.price}>
+                      {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Update Listing
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -545,7 +789,7 @@ export default function SellPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => startEditListing(listing)}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>

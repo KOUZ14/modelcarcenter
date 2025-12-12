@@ -110,7 +110,10 @@ describe('Wishlist Utilities', () => {
     const wishlist = getLocalWishlist();
     
     expect(wishlist).toHaveLength(1);
-    expect(wishlist[0]).toEqual(item);
+    expect(wishlist[0].title).toBe(item.title);
+    expect(wishlist[0].link).toBe(item.link);
+    expect(wishlist[0].price).toBe(item.price);
+    expect(wishlist[0]).toHaveProperty('addedAt'); // Timestamp is added
   });
 
   it('should not add duplicate items', () => {

@@ -116,3 +116,43 @@ export function isInLocalWishlist(link) {
   const wishlist = getLocalWishlist();
   return wishlist.some(w => w.link === link);
 }
+
+/**
+ * Activity tracking
+ */
+const RECENT_ACTIVITY_KEY = 'recent_activity';
+const MAX_ACTIVITY_ITEMS = 20;
+
+export function trackActivity(type, text, metadata = {}) {
+  if (typeof window === 'undefined') return;
+  
+  const activity = getRecentActivity();
+  const newActivity = {
+    id: Date.now(),
+    type, // 'search', 'view', 'wishlist', 'message', 'purchase'
+    text,
+    metadata,
+    timestamp: new Date().toISOString()
+  };
+  
+  // Add to beginning and limit to MAX_ACTIVITY_ITEMS
+  const updated = [newActivity, ...activity].slice(0, MAX_ACTIVITY_ITEMS);
+  localStorage.setItem(RECENT_ACTIVITY_KEY, JSON.stringify(updated));
+  return updated;
+}
+
+export function getRecentActivity() {
+  if (typeof window === 'undefined') return [];
+  const data = localStorage.getItem(RECENT_ACTIVITY_KEY);
+  if (!data) return [];
+  try {
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+export function clearRecentActivity() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(RECENT_ACTIVITY_KEY);
+}

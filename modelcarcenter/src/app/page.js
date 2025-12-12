@@ -90,13 +90,14 @@ export default function Home() {
         const randomSearch = searchTerms[Math.floor(Math.random() * searchTerms.length)];
         
         const response = await fetch(
-          `${API_BASE}/search?q=${encodeURIComponent(randomSearch)}&limit=4`
+          `${API_BASE}/search?q=${encodeURIComponent(randomSearch)}`
         );
         
         if (response.ok) {
           const data = await response.json();
-          if (data.results && data.results.length > 0) {
-            setFeaturedProducts(data.results.slice(0, 4));
+          // API returns array directly
+          if (Array.isArray(data) && data.length > 0) {
+            setFeaturedProducts(data.slice(0, 4));
           }
         }
       } catch (error) {
@@ -167,9 +168,6 @@ export default function Home() {
               <Link href="/search">Browse</Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/sell">Sell</Link>
-            </Button>
-            <Button variant="ghost" size="sm" asChild>
               <Link href="/wishlist">
                 <Heart className="h-4 w-4 mr-1" />
                 Wishlist
@@ -201,24 +199,37 @@ export default function Home() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/wishlist" className="cursor-pointer">
-                      <Heart className="h-4 w-4 mr-2" />
-                      Wishlist
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
                     <Link href="/messages" className="cursor-pointer">
                       <MessageCircle className="h-4 w-4 mr-2" />
                       Messages
                     </Link>
                   </DropdownMenuItem>
-                  {user.account_type === 'shop' && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/sell" className="cursor-pointer">
-                        <Package className="h-4 w-4 mr-2" />
-                        My Listings
-                      </Link>
-                    </DropdownMenuItem>
+                  {user.account_type === 'shop' ? (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/sell" className="cursor-pointer">
+                          <Package className="h-4 w-4 mr-2" />
+                          My Listings
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/register?type=collector" className="cursor-pointer">
+                          <User className="h-4 w-4 mr-2" />
+                          Open Buy Account
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
+                  ) : (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem asChild>
+                        <Link href="/sell" className="cursor-pointer">
+                          <Package className="h-4 w-4 mr-2" />
+                          Open Sell Account
+                        </Link>
+                      </DropdownMenuItem>
+                    </>
                   )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-red-500">
@@ -543,23 +554,35 @@ export default function Home() {
                         idx === 2 && "-mt-4", 
                         idx === 3 && "mt-4"
                       )}
-                      onClick={() => window.open(product.item_url, '_blank')}
+                      onClick={() => {
+                        const url = product.link || product.item_url;
+                        if (url) {
+                          if (url.startsWith('/')) {
+                            window.location.href = url;
+                          } else {
+                            window.open(url, '_blank');
+                          }
+                        }
+                      }}
                     >
                       <div className="aspect-square relative bg-muted rounded-t-lg overflow-hidden">
-                        {product.image_url ? (
+                        {product.image_url && (
                           <img 
                             src={product.image_url} 
                             alt={product.title}
                             className="object-cover w-full h-full"
+                            loading="lazy"
                             onError={(e) => {
                               e.target.style.display = 'none';
-                              e.target.nextSibling.style.display = 'flex';
+                              if (e.target.nextSibling) {
+                                e.target.nextSibling.style.display = 'flex';
+                              }
                             }}
                           />
-                        ) : null}
+                        )}
                         <div 
                           className={cn(
-                            "absolute inset-0 items-center justify-center",
+                            "absolute inset-0 items-center justify-center bg-muted",
                             product.image_url ? "hidden" : "flex"
                           )}
                         >
@@ -569,7 +592,11 @@ export default function Home() {
                       <CardContent className="p-4">
                         <p className="font-medium text-sm line-clamp-2">{product.title}</p>
                         <p className="text-primary font-bold mt-1">
-                          {product.price ? `$${parseFloat(product.price).toFixed(2)}` : 'Price N/A'}
+                          {product.price ? (
+                            typeof product.price === 'string' && product.price.includes(' ') 
+                              ? `$${parseFloat(product.price.split(' ')[0]).toFixed(2)}`
+                              : `$${parseFloat(product.price).toFixed(2)}`
+                          ) : 'Price N/A'}
                         </p>
                         <Badge variant="secondary" className="mt-2 text-xs">
                           {product.seller_name || product.source || 'eBay'}

@@ -17,7 +17,8 @@ import {
   List,
   ArrowLeft,
   User,
-  LogOut
+  LogOut,
+  MessageCircle
 } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -56,7 +57,8 @@ import {
   addToLocalWishlist,
   removeFromLocalWishlist,
   isInLocalWishlist,
-  getAuthHeaders
+  getAuthHeaders,
+  trackActivity
 } from '@/lib/auth';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
@@ -125,6 +127,9 @@ function SearchPageContent() {
     setCars([]);
     setCurrentPage(1);
 
+    // Track search activity
+    trackActivity('search', `Searched for "${searchQuery}"`, { query: searchQuery });
+
     try {
       const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(searchQuery)}`);
       const data = await res.json();
@@ -178,7 +183,7 @@ function SearchPageContent() {
             body: JSON.stringify({
               title: car.title,
               link: car.link,
-              image: car.image,
+              image: car.image_url || car.image,
               price: car.price,
               source: car.source || 'eBay',
             }),
@@ -187,6 +192,11 @@ function SearchPageContent() {
           if (res.ok) {
             const newItem = await res.json();
             setWishlist(prev => [...prev, newItem]);
+            // Track wishlist addition
+            trackActivity('wishlist', `Added "${car.title}" to wishlist`, { 
+              title: car.title, 
+              link: car.link 
+            });
           }
         }
       } catch (err) {
@@ -201,11 +211,16 @@ function SearchPageContent() {
         const newWishlist = addToLocalWishlist({
           title: car.title,
           link: car.link,
-          image: car.image,
+          image: car.image_url || car.image,
           price: car.price,
           source: car.source || 'eBay',
         });
         setWishlist(newWishlist);
+        // Track wishlist addition
+        trackActivity('wishlist', `Added "${car.title}" to wishlist`, { 
+          title: car.title, 
+          link: car.link 
+        });
       }
     }
   };
@@ -775,7 +790,7 @@ function SearchPageContent() {
                         viewMode === 'grid' ? 'aspect-square' : 'w-48 h-36 flex-shrink-0'
                       )}>
                         <Image
-                          src={normalizeImageUrl(car.image)}
+                          src={normalizeImageUrl(car.image_url || car.image)}
                           alt={car.title || 'Model Car'}
                           fill
                           className="object-cover transition-transform duration-300 group-hover:scale-105"
@@ -811,12 +826,21 @@ function SearchPageContent() {
                         </div>
                         <div className="flex items-center justify-between mt-auto pt-2">
                           <span className="text-lg font-bold text-primary">{car.price}</span>
-                          <Button size="sm" asChild>
-                            <a href={car.link} target="_blank" rel="noopener noreferrer">
-                              View
-                              <ExternalLink className="h-3 w-3 ml-1" />
-                            </a>
-                          </Button>
+                          {car.source === 'ModelCarCenter' ? (
+                            <Button size="sm" asChild>
+                              <Link href={`/product/${car.item_id}`}>
+                                <MessageCircle className="h-3 w-3 mr-1" />
+                                Message
+                              </Link>
+                            </Button>
+                          ) : (
+                            <Button size="sm" asChild>
+                              <a href={car.link} target="_blank" rel="noopener noreferrer">
+                                View
+                                <ExternalLink className="h-3 w-3 ml-1" />
+                              </a>
+                            </Button>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
