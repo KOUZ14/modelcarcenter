@@ -37,7 +37,10 @@ import {
 } from "@/components/ui/dialog";
 import { isLoggedIn, getAuthHeaders, trackActivity } from '@/lib/auth';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_BASE ||
+  'http://localhost:8080';
 
 export default function ProductPage() {
   const params = useParams();
@@ -64,7 +67,8 @@ export default function ProductPage() {
   const fetchProduct = async () => {
     try {
       // Try to fetch from our API - check if it's a ModelCarCenter listing
-      const response = await fetch(`${API_BASE}/listings/${params.id}`);
+      const listingId = params.id;
+      const response = await fetch(`${API_BASE_URL}/listings/${listingId}`);
       
       if (response.ok) {
         const data = await response.json();

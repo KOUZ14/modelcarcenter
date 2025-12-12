@@ -12,6 +12,7 @@ import {
   X, 
   Car,
   Heart,
+  ShoppingCart,
   Loader2,
   Grid3X3,
   List,
@@ -364,8 +365,18 @@ function SearchPageContent() {
 
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" asChild>
+              <Link href="/messages" aria-label="Messages">
+                <MessageCircle className="h-5 w-5" />
+              </Link>
+            </Button>
+            <Button variant="ghost" size="icon" asChild>
               <Link href="/wishlist">
                 <Heart className={cn("h-5 w-5", wishlist.length > 0 && "fill-red-500 text-red-500")} />
+              </Link>
+            </Button>
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/cart" aria-label="Cart">
+                <ShoppingCart className="h-5 w-5" />
               </Link>
             </Button>
             <ThemeToggle />
@@ -829,8 +840,7 @@ function SearchPageContent() {
                           {car.source === 'ModelCarCenter' ? (
                             <Button size="sm" asChild>
                               <Link href={`/product/${car.item_id}`}>
-                                <MessageCircle className="h-3 w-3 mr-1" />
-                                Message
+                                View
                               </Link>
                             </Button>
                           ) : (

@@ -11,6 +11,7 @@ import {
   Shield, 
   Heart, 
   Star,
+  ShoppingCart,
   ChevronRight,
   Sparkles,
   Clock,
@@ -168,9 +169,21 @@ export default function Home() {
               <Link href="/search">Browse</Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>
+              <Link href="/messages">
+                <MessageCircle className="h-4 w-4 mr-1" />
+                Messages
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
               <Link href="/wishlist">
                 <Heart className="h-4 w-4 mr-1" />
                 Wishlist
+              </Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/cart">
+                <ShoppingCart className="h-4 w-4 mr-1" />
+                Cart
               </Link>
             </Button>
             <ThemeToggle />
