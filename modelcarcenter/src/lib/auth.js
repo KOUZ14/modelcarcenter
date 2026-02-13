@@ -118,6 +118,39 @@ export function isInLocalWishlist(link) {
 }
 
 /**
+ * Merge local wishlist items to server after login
+ */
+export async function mergeLocalWishlistToServer(token) {
+  const localItems = getLocalWishlist();
+  if (localItems.length === 0) return;
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+  };
+
+  await Promise.allSettled(
+    localItems.map(item =>
+      fetch(`${API_BASE}/wishlists`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          title: item.title,
+          price: item.price,
+          link: item.link,
+          image_url: item.image_url || item.image || null,
+          source: item.source || 'eBay',
+        }),
+      })
+    )
+  );
+
+  // Clear local wishlist after merge
+  saveLocalWishlist([]);
+}
+
+/**
  * Activity tracking
  */
 const RECENT_ACTIVITY_KEY = 'recent_activity';
