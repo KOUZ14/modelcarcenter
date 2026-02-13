@@ -71,6 +71,7 @@ export default function WishlistPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [user, setUser] = useState(null);
+  const [imageErrors, setImageErrors] = useState({});
 
   useEffect(() => {
     // Check if user is logged in using consistent auth
@@ -272,12 +273,19 @@ export default function WishlistPage() {
             {wishlist.map((item, idx) => (
               <Card key={item.id || idx} className="group overflow-hidden">
                 <div className="relative aspect-square bg-muted">
-                  <Image
-                    src={normalizeImageUrl(item.image)}
-                    alt={item.title || 'Model Car'}
-                    fill
-                    className="object-cover"
-                  />
+                  {imageErrors[item.id || idx] ? (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Car className="h-16 w-16 text-muted-foreground" />
+                    </div>
+                  ) : (
+                    <Image
+                      src={normalizeImageUrl(item.image || item.image_url)}
+                      alt={item.title || 'Model Car'}
+                      fill
+                      className="object-cover"
+                      onError={() => setImageErrors(prev => ({ ...prev, [item.id || idx]: true }))}
+                    />
+                  )}
                   <ConfirmDialog
                     title="Remove from wishlist?"
                     description="This item will be removed from your wishlist."
