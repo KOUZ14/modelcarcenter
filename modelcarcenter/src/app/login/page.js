@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { saveSession, isLoggedIn } from '@/lib/auth';
+import { saveSession, isLoggedIn, mergeLocalWishlistToServer } from '@/lib/auth';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080';
 
@@ -59,7 +59,10 @@ export default function LoginPage() {
 
       // Store token and user data using shared auth utility
       saveSession(data.token, data.user);
-      
+
+      // Merge any local wishlist items to the server
+      await mergeLocalWishlistToServer(data.token);
+
       // Redirect to dashboard
       router.push('/dashboard');
     } catch (err) {

@@ -76,6 +76,15 @@ export default function MessagesPage() {
     fetchThreads();
   }, [router]);
 
+  // Poll for new messages in the selected thread
+  useEffect(() => {
+    if (!selectedThread || selectedThread.isDemo) return;
+    const intervalId = setInterval(() => {
+      fetchMessages(selectedThread.id);
+    }, 4000);
+    return () => clearInterval(intervalId);
+  }, [selectedThread]);
+
   const fetchThreads = async () => {
     try {
       setLoading(true);
@@ -172,9 +181,12 @@ export default function MessagesPage() {
           read: !!msg.read_at
         })).reverse(); // Reverse since API returns newest first
         setMessages(transformedMessages);
+      } else {
+        setMessages([]);
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
+      setMessages([]);
     }
   };
 
@@ -256,7 +268,7 @@ export default function MessagesPage() {
     } else {
       // Real API call - use the correct endpoint
       try {
-        await fetch(`${API_BASE}/messages/conversations/${selectedThread.id}/messages`, {
+        const response = await fetch(`${API_BASE}/messages/conversations/${selectedThread.id}/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -266,8 +278,16 @@ export default function MessagesPage() {
             content: messageText
           })
         });
+        if (!response.ok) {
+          // Rollback optimistic message and restore input
+          setMessages(prev => prev.filter(m => m.id !== userMessage.id));
+          setNewMessage(messageText);
+        }
       } catch (error) {
         console.error('Error sending message:', error);
+        // Rollback optimistic message and restore input
+        setMessages(prev => prev.filter(m => m.id !== userMessage.id));
+        setNewMessage(messageText);
       }
     }
 
