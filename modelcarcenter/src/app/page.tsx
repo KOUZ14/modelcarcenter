@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { HeroSection } from '@/components/features';
 import { AccountForm } from '@/components/AccountForm';
 import { AccountList } from '@/components/AccountList';
 import { ListingCard } from '@/components/ListingCard';
@@ -19,13 +20,11 @@ export default function DashboardPage() {
   const { toast } = useToast();
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingListing, setEditingListing] = useState<Listing | null>(null);
-  const { selectedAccountId, setSelectedAccountId, cart, addToCart, removeFromCart } = useAccountStore((state) => ({
-    selectedAccountId: state.selectedAccountId,
-    setSelectedAccountId: state.setSelectedAccountId,
-    cart: state.cart,
-    addToCart: state.addToCart,
-    removeFromCart: state.removeFromCart,
-  }));
+  const selectedAccountId = useAccountStore((state) => state.selectedAccountId);
+  const setSelectedAccountId = useAccountStore((state) => state.setSelectedAccountId);
+  const cart = useAccountStore((state) => state.cart);
+  const addToCart = useAccountStore((state) => state.addToCart);
+  const removeFromCart = useAccountStore((state) => state.removeFromCart);
 
   const accountsQuery = useQuery({
     queryKey: ['accounts'],
@@ -171,16 +170,18 @@ export default function DashboardPage() {
   const accountCount = accountsQuery.data?.length ?? 0;
 
   return (
-    <div className="space-y-10">
-      <section className="hero-surface relative overflow-hidden rounded-4xl border border-white/10 p-8 shadow-elevation sm:p-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(96,165,250,0.18),transparent_35%),radial-gradient(circle_at_80%_10%,rgba(244,113,181,0.16),transparent_30%)]" aria-hidden />
-        <div className="absolute -right-10 -top-20 h-56 w-56 rounded-full bg-brand-500/20 blur-[120px]" aria-hidden />
-        <div className="absolute -left-20 bottom-0 h-64 w-64 rounded-full bg-accent-500/20 blur-[130px]" aria-hidden />
-        <div className="relative grid items-center gap-10 lg:grid-cols-[1.3fr,1fr]">
-          <div className="space-y-6">
-            <span className="inline-flex items-center rounded-full bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white shadow-card">
-              Modelcar atelier
-            </span>
+    <>
+      <HeroSection />
+      <div className="space-y-10">
+        <section className="hero-surface relative overflow-hidden rounded-4xl border border-white/10 p-8 shadow-elevation sm:p-10">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(96,165,250,0.18),transparent_35%),radial-gradient(circle_at_80%_10%,rgba(244,113,181,0.16),transparent_30%)]" aria-hidden />
+          <div className="absolute -right-10 -top-20 h-56 w-56 rounded-full bg-brand-500/20 blur-[120px]" aria-hidden />
+          <div className="absolute -left-20 bottom-0 h-64 w-64 rounded-full bg-accent-500/20 blur-[130px]" aria-hidden />
+          <div className="relative grid items-center gap-10 lg:grid-cols-[1.3fr,1fr]">
+            <div className="space-y-6">
+              <span className="inline-flex items-center rounded-full bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white shadow-card">
+                Modelcar atelier
+              </span>
             <div className="space-y-3">
               <h1 className="text-3xl font-semibold leading-tight text-white sm:text-[2.4rem]">
                 A clean, elevated shop for limited-run diecast collectibles.
@@ -412,6 +413,8 @@ export default function DashboardPage() {
           isSaving={createListingMutation.isPending || updateListingMutation.isPending}
         />
       </div>
-    </div>
+    </>
+  );
+}
   );
 }

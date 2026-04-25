@@ -12,10 +12,8 @@ const variantStyles: Record<string, string> = {
 };
 
 export function ToastViewport() {
-  const { toasts, dismiss } = useToastStore((state) => ({
-    toasts: state.toasts,
-    dismiss: state.dismiss,
-  }));
+  const toasts = useToastStore((state) => state.toasts);
+  const dismiss = useToastStore((state) => state.dismiss);
 
   useEffect(() => {
     const timers = toasts.map((toast) => {
